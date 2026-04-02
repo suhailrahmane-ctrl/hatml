@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AFG Block Game</title>
+
+<style>
+  body {
+    background: #111;
+    color: white;
+    text-align: center;
+    font-family: sans-serif;
+  }
+
+  canvas {
+    background: #222;
+    margin-top: 20px;
+    border: 2px solid #555;
+  }
+
+  button {
+    padding: 10px;
+    margin: 5px;
+    font-size: 18px;
+  }
+</style>
+</head>
+
+<body>
+
+<h1>AFG Block Blast 🎮</h1>
+<h3>Score: <span id="score">0</span></h3>
+
+<canvas id="game" width="300" height="600"></canvas>
+
+<!-- دکمه‌های موبایل -->
+<div>
+  <button onclick="moveLeft()">⬅️</button>
+  <button onclick="moveDown()">⬇️</button>
+  <button onclick="moveRight()">➡️</button>
+  <button onclick="rotatePiece()">🔄</button>
+  <button onclick="togglePause()">⏸️</button>
+</div>
+
+<!-- صدا -->
+<audio id="clearSound" src="https://www.soundjay.com/button/beep-07.wav"></audio>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const ROWS = 20;
+const COLS = 10;
+const SIZE = 30;
+
+let board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+
+let score = 0;
+let speed = 500;
+let paused = false;
+
+// بلاک‌ها با رنگ
+const shapes = [
+  {shape:[[1,1,1,1]], color:"cyan"},
+  {shape:[[1,1],[1,1]], color:"yellow"},
+  {shape:[[0,1,0],[1,1,1]], color:"purple"},
+  {shape:[[1,0,0],[1,1,1]], color:"orange"},
+  {shape:[[0,0,1],[1,1,1]], color:"blue"}
+];
+
+let piece = createPiece();
+
+function createPiece() {
+  const item = shapes[Math.floor(Math.random()*shapes.length)];
+  return {
+    shape: item.shape,
+    color: item.color,
+    x: 3,
+    y: 0
+  };
+}
+
+function drawCell(x,y,color="white") {
+  ctx.fillStyle = color;
+  ctx.fillRect(x*SIZE, y*SIZE, SIZE-1, SIZE-1);
+}
+
+function drawBoard() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  board.forEach((row,y)=>{
+    row.forEach((val,x)=>{
+      if(val) drawCell(x,y,"gray");
+    });
+  });
+
+  piece.shape.forEach((row,y)=>{
+    row.forEach((val,x)=>{
+      if(val) drawCell(piece.x+x, piece.y+y, piece.color);
+    });
+  });
+}
+
+function collide() {
+  return piece.shape.some((row,y)=>
+    row.some((val,x)=>{
+      if(!val) return false;
+      let newX = piece.x + x;
+      let newY = piece.y + y;
+
+      return (
+        newX < 0 ||
+        newX >= COLS ||
+        newY >= ROWS ||
+        board[newY][newX]
+      );
+    })
+  );
+}
+
+function merge() {
+  piece.shape.forEach((row,y)=>{
+    row.forEach((val,x)=>{
+      if(val){
+        board[piece.y+y][piece.x+x] = 1;
+      }
+    });
+  });
+}
+
+function clearLines() {
+  for(let y=ROWS-1;y>=0;y--){
+    if(board[y].every(cell=>cell)){
+      board.splice(y,1);
+      board.unshift(Array(COLS).fill(0));
+
+      score += 10;
+      document.getElementById("score").innerText = score;
+
+      document.getElementById("clearSound").play();
+
+      if(score % 50 === 0){
+        speed = Math.max(100, speed - 50);
+      }
+    }
+  }
+}
+
+function rotate() {
+  const newShape = piece.shape[0].map((_,i)=>
+    piece.shape.map(row=>row[i]).reverse()
+  );
+
+  const oldShape = piece.shape;
+  piece.shape = newShape;
+
+  if(collide()){
+    piece.shape = oldShape;
+  }
+}
+
+function update() {
+  piece.y++;
+
+  if(collide()){
+    piece.y--;
+    merge();
+    clearLines();
+    piece = createPiece();
+
+    if(collide()){
+      alert("Game Over 😢");
+      board = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
+      score = 0;
+      speed = 500;
+    }
+  }
+
+  drawBoard();
+}
+
+// کنترل کیبورد
+document.addEventListener("keydown", e=>{
+  if(e.key==="ArrowLeft"){
+    piece.x--;
+    if(collide()) piece.x++;
+  }
+
+  if(e.key==="ArrowRight"){
+    piece.x++;
+    if(collide()) piece.x--;
+  }
+
+  if(e.key==="ArrowDown"){
+    piece.y++;
+  }
+
+  if(e.key==="ArrowUp"){
+    rotate();
+  }
+
+  drawBoard();
+});
+
+// کنترل موبایل
+function moveLeft(){
+  piece.x--;
+  if(collide()) piece.x++;
+  drawBoard();
+}
+
+function moveRight(){
+  piece.x++;
+  if(collide()) piece.x--;
+  drawBoard();
+}
+
+function moveDown(){
+  piece.y++;
+  drawBoard();
+}
+
+function rotatePiece(){
+  rotate();
+  drawBoard();
+}
+
+function togglePause(){
+  paused = !paused;
+}
+
+// لوپ بازی
+function gameLoop(){
+  if(!paused){
+    update();
+  }
+  setTimeout(gameLoop, speed);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
